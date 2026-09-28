@@ -2,12 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'https://www.liverpool.com.mx';
 const isCI = !!process.env.CI;
-
+const DESKTOP_VIEWPORT = { width: 1920, height: 1080 };
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 2 : 1,
   workers: isCI ? 2 : undefined,
   timeout: isCI ? 120_000 : 90_000,
   expect: {
@@ -47,6 +47,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: DESKTOP_VIEWPORT,
         launchOptions: {
           args: [
             '--disable-blink-features=AutomationControlled',
@@ -56,7 +57,7 @@ export default defineConfig({
         },
       },
     },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'], viewport: DESKTOP_VIEWPORT } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'], viewport: DESKTOP_VIEWPORT } },
   ],
 });

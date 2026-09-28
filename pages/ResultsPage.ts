@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 export interface ExtractedProduct {
@@ -8,7 +8,6 @@ export interface ExtractedProduct {
 }
 
 export class ResultsPage extends BasePage {
-  private readonly filterButton = this.page.getByTestId('plp-page-filter-button');
   private readonly sortButton = this.page.getByTestId('dropdown-sorting-button');
   private readonly productList = this.page.locator('#plp-page-card-product-list');
 
@@ -52,19 +51,17 @@ export class ResultsPage extends BasePage {
    * expandidas por default (no hay que desplegar "Color" aparte).
    */
   async filterByColor(colorName: string): Promise<void> {
-  await this.waitForResults();
+    await this.waitForResults();
 
-  const colorLabel = this.page.locator('label').filter({ hasText: colorName });
+    const colorLabel = this.page.locator('label').filter({ hasText: colorName });
+    await expect(
+      colorLabel,
+      `No aparece el filtro de color "${colorName}" para esta búsqueda`
+    ).toBeVisible();
 
-  const isAlreadyVisible = await colorLabel.isVisible().catch(() => false);
-
-  if (!isAlreadyVisible) {
-    await this.filterButton.click();
+    await this.clickAndWaitForSearchResponse(() => colorLabel.click());
+    await this.waitForResults();
   }
-
-  await this.clickAndWaitForSearchResponse(() => colorLabel.click());
-  await this.waitForResults();
-}
 
   /**
    * Abre el dropdown de ordenamiento y selecciona
