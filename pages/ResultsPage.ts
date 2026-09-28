@@ -1,5 +1,7 @@
-import { Page, expect } from '@playwright/test';
+import { Page, Response, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
+import { SEARCH_API_PATTERN } from '../config/constants';
+import { parsePrice } from '../utils/price';
 
 export interface ExtractedProduct {
   productId: string;
@@ -35,14 +37,19 @@ export class ResultsPage extends BasePage {
    * Evita condiciones de carrera donde el DOM "viejo" ya está visible
    * y un chequeo simple de visibilidad no detecta que aún falta la
    * actualización real de los resultados.
+   *
+   * Devuelve la respuesta interceptada para poder validarla contra la UI.
+   * La espera se registra ANTES de la acción (Promise.all) para no perder
+   * respuestas rápidas.
    */
-  private async clickAndWaitForSearchResponse(action: () => Promise<void>): Promise<void> {
-    await Promise.all([
+  private async clickAndWaitForSearchResponse(action: () => Promise<void>): Promise<Response> {
+    const [response] = await Promise.all([
       this.page.waitForResponse(
-        (response) => /api\/plp\/search/i.test(response.url()) && response.status() === 200
+        (res) => SEARCH_API_PATTERN.test(res.url()) && res.status() === 200
       ),
       action(),
     ]);
+    return response;
   }
 
   /**
@@ -66,14 +73,17 @@ export class ResultsPage extends BasePage {
   /**
    * Abre el dropdown de ordenamiento y selecciona
    * "Menor precio" (orden ascendente).
+   * Devuelve la respuesta de /api/plp/search que originó el listado ya ordenado
+   * (la que la UI está mostrando), para la validación cruzada.
    */
-  async sortByPriceAscending(): Promise<void> {
+  async sortByPriceAscending(): Promise<Response> {
     await this.waitForResults();
     await this.sortButton.click();
 
     const option = this.page.getByRole('option', { name: 'Menor precio' });
-    await this.clickAndWaitForSearchResponse(() => option.click());
+    const response = await this.clickAndWaitForSearchResponse(() => option.click());
     await this.waitForResults();
+    return response;
   }
 
   /**
@@ -101,25 +111,12 @@ export class ResultsPage extends BasePage {
         .locator('[data-testid$="-price"]')
         .first()
         .textContent();
-      const price = this.parsePrice(priceText ?? '');
+      
+      const price = parsePrice(priceText ?? '');
 
       products.push({ productId, name, price });
     }
 
     return products;
-  }
-
-  /**
-   * Extrae el primer precio con formato "$X,XXX.XX" de un texto,
-   * incluso si el texto contiene un segundo precio pegado
-   * (ej. precio de venta + precio tachado por descuento).
-   */
-  private parsePrice(rawText: string): number | null {
-    const match = rawText.match(/\$\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/);
-    if (!match) return null;
-
-    const numericString = match[1].replace(/,/g, '');
-    const value = parseFloat(numericString);
-    return Number.isFinite(value) ? value : null;
   }
 }
